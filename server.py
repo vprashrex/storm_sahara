@@ -184,8 +184,8 @@ def update_frames():
     global first_time,current_frame,vechicle_count1,vechicle_count2,vechicle_count3,vechicle_count4,max_count,label_frame
     cap1 = cv2.VideoCapture('video.mp4')
     cap2 = cv2.VideoCapture('video2.mp4')
-    cap3 = cv2.VideoCapture('video.mp4')
-    cap4 = cv2.VideoCapture('video.mp4')
+    cap3 = cv2.VideoCapture('video3.mp4')
+    cap4 = cv2.VideoCapture('video4.mp4')
     
     while True:
         ret1, frame1 = cap1.read()
@@ -237,7 +237,6 @@ def update_frames():
             label1_signal.config(text=f"Traffic Signal: {signal_states[0]}")
         
         if vechicle_count2 != 0:
-            result = label_frame[1] if label_frame[1] else "NIL"
             label2_signal.config(text=f"Traffic Signal: {signal_states[1]}, Vechicle Count: {vechicle_count2}")
         else:
             label2_signal.config(text=f"Traffic Signal: {signal_states[1]}")
