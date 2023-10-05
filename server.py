@@ -5,7 +5,7 @@ from PIL import Image, ImageTk
 import threading
 import numpy as np
 import time
-
+import datetime
 '''
 traffic signal switch algorithm
 vechicle detection
@@ -23,6 +23,8 @@ class Detection:
         cfg_file = "yolov4-tiny.cfg"
         weights_file = "yolov4-tiny.weights"
         self.net = cv2.dnn.readNet(weights_file, cfg_file)
+        self.net.setPreferableBackend(cv2.dnn.DNN_BACKEND_CUDA)
+        self.net.setPreferableTarget(cv2.dnn.DNN_TARGET_CUDA)
 
         classes_file = "coco.names"
         with open(classes_file, 'r') as f:
@@ -100,6 +102,8 @@ class Detection:
         return frame,vechicle_count
 
 
+active_frame = 0  # Initialize to the first frame as active
+max_count = 0
 # Traffic signal states
 signal_states = ["Green", "Red", "Red", "Red"]  # Each frame starts with Green
 current_frame = 0
@@ -108,34 +112,67 @@ signal_timers = [switch_interval] * 4  # Initial timers for each frame
 
 video_paused = [False, False, False, False]
 
+
+# Define the duration for each signal state
+
+detection = Detection()
+
+
+first_time = True
+signal_durations = {
+    "case1": {"green",10},
+    "case2": {"green": 20},
+    "case3": {"green": 30},
+    "case4": {"green": 60},
+}
+vechicle_count1,vechicle_count2,vechicle_count3,vechicle_count4 = 0,0,0,0
+
+
+def count_condition(max_count):
+    if max_count > 30:
+        highest_priority_case = "case4"
+    elif 11 <= max_count <= 30:
+        highest_priority_case = "case3"
+    elif 1 <= max_count <= 10:
+        highest_priority_case = "case2"
+    else:
+        highest_priority_case = "case1"
+
+    return highest_priority_case
+
+
 def switch_traffic_signal():
-    global current_frame
+    global current_frame, active_frame,max_count
     while True:
         current_frame = (current_frame + 1) % 4
+        active_frame = current_frame  # Set the current frame as active
         signal_states[current_frame] = "Green"
         for i in range(4):
             if i != current_frame:
                 signal_states[i] = "Red"
-                video_paused[i] = True  # Pause video when signal is red
+                video_paused[i] = True  # Pause video when the signal is red
             else:
-                video_paused[i] = False  # Resume video when signal is green
+                video_paused[i] = False  # Resume video when the signal is green
         time.sleep(switch_interval)
 
-# Create a thread for signal switching
+
 signal_thread = threading.Thread(target=switch_traffic_signal)
 signal_thread.daemon = True
 signal_thread.start()
 
+
+def update_frame_counts(frame,count):
+    frame_counts = {}
+    frame_counts[frame] = count  
+    return frame_counts
+
 # Function to update the video frames
 def update_frames():
+    global first_time,current_frame,vechicle_count1,vechicle_count2,vechicle_count3,vechicle_count4,max_count
     cap1 = cv2.VideoCapture('video.mp4')
     cap2 = cv2.VideoCapture('video2.mp4')
     cap3 = cv2.VideoCapture('video.mp4')
     cap4 = cv2.VideoCapture('video.mp4')
-
-
-
-    detection = Detection()
     
     while True:
         ret1, frame1 = cap1.read()
@@ -146,11 +183,6 @@ def update_frames():
         if not ret1 or not ret2 or not ret3 or not ret4:
             break
 
-        for i in range(4):
-            signal_timers[i] -= 1
-            if signal_timers[i] < 0:
-                signal_timers[i] = 0
-        
         if signal_states[0] == "Red":
             cap1.set(cv2.CAP_PROP_POS_FRAMES, cap1.get(cv2.CAP_PROP_POS_FRAMES) - 1)  
         if signal_states[1] == "Red":
@@ -169,33 +201,44 @@ def update_frames():
         frame3 = cv2.resize(frame3, (640, 400))
         frame4 = cv2.resize(frame4, (640, 400))
 
-        # Add text labels for traffic signals
-        text1 = f"Traffic Signal: {signal_states[0]}"
-        text2 = f"Traffic Signal: {signal_states[1]}"
-        text3 = f"Traffic Signal: {signal_states[2]}"
-        text4 = f"Traffic Signal: {signal_states[3]}"
 
-        frame1,vechicle_count1 = detection.detect(frame1)
-        frame2,vechicle_count2 = detection.detect(frame2)
-        frame3,vechicle_count3 = detection.detect(frame3)
-        frame4,vechicle_count4 = detection.detect(frame4)
+   
 
-        # signal color
-        ''' signal_color1 = "Red" if signal_states[0] == "Red" else "Green"
-        signal_color2 = "Red" if signal_states[1] == "Red" else "Green"
-        signal_color3 = "Red" if signal_states[2] == "Red" else "Green"
-        signal_color4 = "Red" if signal_states[3] == "Red" else "Green" '''
+        max_count = max(vechicle_count1,vechicle_count2,vechicle_count3,vechicle_count4)                 
 
-        label1_signal.config(text=f"Traffic Signal: {signal_states[0]}, Vechicle Count: {vechicle_count1}")
-        label2_signal.config(text=f"Traffic Signal: {signal_states[1]}, Vechicle Count: {vechicle_count2}")
-        label3_signal.config(text=f"Traffic Signal: {signal_states[2]}, Vechicle Count: {vechicle_count3}")
-        label4_signal.config(text=f"Traffic Signal: {signal_states[3]}, Vechicle Count: {vechicle_count4}")
+        if current_frame != active_frame:
+            vechicle_count1, vechicle_count2, vechicle_count3, vechicle_count4 = 0, 0, 0, 0  # No vehicle count available
+        else:
+            frame1, vechicle_count1 = detection.detect(frame1) if current_frame != 0 else (frame1, 0)
+            frame2, vechicle_count2 = detection.detect(frame2) if current_frame != 1 else (frame2, 0)
+            frame3, vechicle_count3 = detection.detect(frame3) if current_frame != 2 else (frame3, 0)
+            frame4, vechicle_count4 = detection.detect(frame4) if current_frame != 3 else (frame4, 0)
 
-        ''' frame1 = cv2.putText(frame1, text1, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1,(0,0,255)if signal_states[0] == "Red" else (0,255,0), 2)
-        frame2 = cv2.putText(frame2, text2, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255)if signal_states[1] == "Red" else (0,255,0), 2)
-        frame3 = cv2.putText(frame3, text3, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255)if signal_states[2] == "Red" else (0,255,0), 2)
-        frame4 = cv2.putText(frame4, text4, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255)if signal_states[3] == "Red" else (0,255,0), 2)
-        '''
+
+        
+
+        if vechicle_count1 != 0:
+            label1_signal.config(text=f"Traffic Signal: {signal_states[0]}, Vechicle Count: {vechicle_count1}")
+        else:
+            label1_signal.config(text=f"Traffic Signal: {signal_states[0]}")
+        
+        if vechicle_count2 != 0:
+            label2_signal.config(text=f"Traffic Signal: {signal_states[1]}, Vechicle Count: {vechicle_count2}")
+        else:
+            label2_signal.config(text=f"Traffic Signal: {signal_states[1]}")
+
+        if vechicle_count3 !=0:
+            label3_signal.config(text=f"Traffic Signal: {signal_states[2]}, Vechicle Count: {vechicle_count3}")
+        else:
+            label3_signal.config(text=f"Traffic Signal: {signal_states[2]}")
+
+        if vechicle_count4 !=0:
+            label4_signal.config(text=f"Traffic Signal: {signal_states[3]}, Vechicle Count: {vechicle_count4}")
+        else:
+            label4_signal.config(text=f"Traffic Signal: {signal_states[3]}")
+
+
+
         # Convert frames to Tkinter format
         img1 = Image.fromarray(cv2.cvtColor(frame1, cv2.COLOR_BGR2RGB))
         img2 = Image.fromarray(cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB))
