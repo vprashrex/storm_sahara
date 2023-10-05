@@ -5,7 +5,7 @@ from PIL import Image, ImageTk
 import threading
 import numpy as np
 import time
-import datetime
+
 '''
 traffic signal switch algorithm
 vechicle detection
@@ -104,27 +104,28 @@ class Detection:
 
 active_frame = 0  # Initialize to the first frame as active
 max_count = 0
-# Traffic signal states
-signal_states = ["Green", "Red", "Red", "Red"]  # Each frame starts with Green
+#signal_states = ["Green", "Red", "Red", "Red"]  # Each frame starts with Green
 current_frame = 0
-switch_interval = 8  # Time interval (in seconds) for signal switching
-signal_timers = [switch_interval] * 4  # Initial timers for each frame
+switch_interval = 8
+signal_timers = [switch_interval] * 4 
 
-video_paused = [False, False, False, False]
+#video_paused = [False, False, False, False]
 
+signal_states = ["Red", "Red", "Red", "Red"]
+video_paused = [True, True, True, True]
 
-# Define the duration for each signal state
 
 detection = Detection()
 
 
 first_time = True
 signal_durations = {
-    "case1": {"green",10},
+    "case1": {"green": 5},
     "case2": {"green": 20},
     "case3": {"green": 30},
     "case4": {"green": 60},
 }
+
 vechicle_count1,vechicle_count2,vechicle_count3,vechicle_count4 = 0,0,0,0
 
 
@@ -140,20 +141,32 @@ def count_condition(max_count):
 
     return highest_priority_case
 
-
+max_count_used = False 
+label_frame = {}
 def switch_traffic_signal():
-    global current_frame, active_frame,max_count
+    global current_frame, active_frame, max_count,label_frame
+
     while True:
         current_frame = (current_frame + 1) % 4
-        active_frame = current_frame  # Set the current frame as active
+        active_frame = current_frame
         signal_states[current_frame] = "Green"
         for i in range(4):
             if i != current_frame:
                 signal_states[i] = "Red"
-                video_paused[i] = True  # Pause video when the signal is red
+                video_paused[i] = True 
             else:
-                video_paused[i] = False  # Resume video when the signal is green
-        time.sleep(switch_interval)
+                video_paused[i] = False
+
+
+        highest_priority_case = count_condition(max_count)
+        duration = signal_durations[highest_priority_case]["green"]
+        print("vechicle count : {} frame {} duration is {}".format(max_count,current_frame,duration))
+        label_frame[current_frame] = duration
+
+        if max_count > 0 and max_count >= duration:
+            time.sleep(switch_interval + duration)
+        else:
+            time.sleep(switch_interval)
 
 
 signal_thread = threading.Thread(target=switch_traffic_signal)
@@ -168,7 +181,7 @@ def update_frame_counts(frame,count):
 
 # Function to update the video frames
 def update_frames():
-    global first_time,current_frame,vechicle_count1,vechicle_count2,vechicle_count3,vechicle_count4,max_count
+    global first_time,current_frame,vechicle_count1,vechicle_count2,vechicle_count3,vechicle_count4,max_count,label_frame
     cap1 = cv2.VideoCapture('video.mp4')
     cap2 = cv2.VideoCapture('video2.mp4')
     cap3 = cv2.VideoCapture('video.mp4')
@@ -215,14 +228,16 @@ def update_frames():
             frame4, vechicle_count4 = detection.detect(frame4) if current_frame != 3 else (frame4, 0)
 
 
-        
+
 
         if vechicle_count1 != 0:
+            
             label1_signal.config(text=f"Traffic Signal: {signal_states[0]}, Vechicle Count: {vechicle_count1}")
         else:
             label1_signal.config(text=f"Traffic Signal: {signal_states[0]}")
         
         if vechicle_count2 != 0:
+            result = label_frame[1] if label_frame[1] else "NIL"
             label2_signal.config(text=f"Traffic Signal: {signal_states[1]}, Vechicle Count: {vechicle_count2}")
         else:
             label2_signal.config(text=f"Traffic Signal: {signal_states[1]}")
