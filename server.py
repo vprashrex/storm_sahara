@@ -113,6 +113,7 @@ signal_timers = [switch_interval] * 4
 
 signal_states = ["Red", "Red", "Red", "Red"]
 video_paused = [True, True, True, True]
+prev_frame = {}
 
 
 detection = Detection()
@@ -161,7 +162,7 @@ def switch_traffic_signal():
         highest_priority_case = count_condition(max_count)
         duration = signal_durations[highest_priority_case]["green"]
         print("vechicle count : {} frame {} duration is {}".format(max_count,current_frame,duration))
-        label_frame[current_frame] = duration
+        label_frame[current_frame] = [duration,max_count]
 
         if max_count > 0 and max_count >= duration:
             time.sleep(switch_interval + duration)
@@ -221,35 +222,32 @@ def update_frames():
 
         if current_frame != active_frame:
             vechicle_count1, vechicle_count2, vechicle_count3, vechicle_count4 = 0, 0, 0, 0  # No vehicle count available
+
         else:
             frame1, vechicle_count1 = detection.detect(frame1) if current_frame != 0 else (frame1, 0)
             frame2, vechicle_count2 = detection.detect(frame2) if current_frame != 1 else (frame2, 0)
             frame3, vechicle_count3 = detection.detect(frame3) if current_frame != 2 else (frame3, 0)
             frame4, vechicle_count4 = detection.detect(frame4) if current_frame != 3 else (frame4, 0)
 
-
-
-
         if vechicle_count1 != 0:
-            
-            label1_signal.config(text=f"Traffic Signal: {signal_states[0]}, Vechicle Count: {vechicle_count1}")
+            label1_signal.config(text=f"Traffic Signal: {signal_states[0]}, Vechicle Count: {vechicle_count1}",foreground="red")
         else:
-            label1_signal.config(text=f"Traffic Signal: {signal_states[0]}")
+            label1_signal.config(text=f"Traffic Signal: {signal_states[0]}, Duration : {label_frame[0][0]}, Tot_Vech : {label_frame[0][1]}",foreground="green")
         
         if vechicle_count2 != 0:
-            label2_signal.config(text=f"Traffic Signal: {signal_states[1]}, Vechicle Count: {vechicle_count2}")
+            label2_signal.config(text=f"Traffic Signal: {signal_states[1]}, Vechicle Count: {vechicle_count2}",foreground="red")
         else:
-            label2_signal.config(text=f"Traffic Signal: {signal_states[1]}")
+            label2_signal.config(text=f"Traffic Signal: {signal_states[1]}, Duration : {label_frame[1][0]}, Tot_Vech: {label_frame[1][1]}",foreground="green")
 
         if vechicle_count3 !=0:
-            label3_signal.config(text=f"Traffic Signal: {signal_states[2]}, Vechicle Count: {vechicle_count3}")
+            label3_signal.config(text=f"Traffic Signal: {signal_states[2]}, Vechicle Count: {vechicle_count3}",foreground="red")
         else:
-            label3_signal.config(text=f"Traffic Signal: {signal_states[2]}")
+            label3_signal.config(text=f"Traffic Signal: {signal_states[2]}, Duration : {label_frame[2][0]},Tot_Vech: {label_frame[2][1]}",foreground="green")
 
         if vechicle_count4 !=0:
-            label4_signal.config(text=f"Traffic Signal: {signal_states[3]}, Vechicle Count: {vechicle_count4}")
+            label4_signal.config(text=f"Traffic Signal: {signal_states[3]}, Vechicle Count: {vechicle_count4}",foreground="red")
         else:
-            label4_signal.config(text=f"Traffic Signal: {signal_states[3]}")
+            label4_signal.config(text=f"Traffic Signal: {signal_states[3]},Duration : {label_frame[3][0]}, Tot_Vech: {label_frame[3][1]}",foreground="green")
 
 
 
